@@ -1,0 +1,147 @@
+version: '3.8'
+
+services:
+  mariadb:
+    image: mariadb:11.4
+    container_name: pos-mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: pos_db
+      MYSQL_USER: pos_app
+      MYSQL_PASSWORD: ${DB_APP_PASSWORD}
+    command:
+      - --bind-address=${LAN_IP}
+      - --max-connections=200
+      - --innodb-buffer-pool-size=256M
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - pos-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pos-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: mysql+asyncmy://pos_app:${DB_APP_PASSWORD}@mariadb:3306/pos_db
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ALGORITHM: RS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 15
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+      BUSINESS_TYPE: ${BUSINESS_TYPE}
+      TIMEZONE: ${TIMEZONE}
+      FDE_PAC_PROVIDER: ${FDE_PAC_PROVIDER}
+      TECNODATA_API_KEY: ${TECNODATA_API_KEY}
+      COMPANY_NIT: ${COMPANY_NIT}
+      FDE_TEST_MODE: ${FDE_TEST_MODE}
+      BACKUP_ENCRYPT: ${BACKUP_ENCRYPT}
+      BACKUP_ENCRYPT_KEY: ${BACKUP_ENCRYPT_KEY}
+    volumes:
+      - backend_uploads:/app/uploads
+    networks:
+      - pos-network
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: builder
+    container_name: pos-frontend-builder
+    command: ["npm", "run", "build"]
+    volumes:
+      - frontend_dist:/app/dist
+    networks:
+      - pos-network
+
+  caddy:
+    image: caddy:2.8-alpine
+    container_name: pos-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      LAN_IP: ${LAN_IP}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/entrypoint.sh:/entrypoint.sh:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - frontend_dist:/var/www/frontend:ro
+      - backend_uploads:/var/www/uploads:ro
+    networks:
+      - pos-network
+    depends_on:
+      - backend
+      - frontend
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    healthcheck:
+      test: ["CMD", "curl", "-kf", "https://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+        reservations:
+          memory: 32M
+
+  avahi:
+    image: ghcr.io/linuxserver/avahi:latest
+    container_name: pos-avahi
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: ${TIMEZONE}
+    volumes:
+      - ./avahi/pos.service:/etc/avahi/services/pos.service:ro
+      - ./avahi/entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    profiles:
+      - linux
+
+volumes:
+  mariadb_data:
+  caddy_data:
+  caddy_config:
+  backend_uploads:
+  frontend_dist:
+
+networks:
+  pos-network:
+    driver: bridge

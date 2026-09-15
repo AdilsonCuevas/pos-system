@@ -1,0 +1,69 @@
+{
+    admin off
+    local_certs
+    # Auto-HTTPS with mkcert local CA
+}
+
+# HTTP -> HTTPS redirect
+:80 {
+    redir https://{host}{uri} permanent
+}
+
+# Main POS domain (mDNS: pos.local)
+pos.local {
+    tls internal
+    
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+    
+    # Frontend SPA
+    root * /var/www/frontend
+    try_files {path} /index.html
+    file_server {
+        browse off
+    }
+    
+    # API proxy
+    handle_path /api/* {
+        reverse_proxy backend:8000 {
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto https
+            header_up X-Real-IP {remote_host}
+        }
+    }
+    
+    # WebSocket for real-time sync
+    handle_path /ws/* {
+        reverse_proxy backend:8000
+    }
+    
+    # Static uploads (receipts, PDFs, images)
+    handle_path /uploads/* {
+        root * /var/www
+        file_server {
+            browse off
+        }
+    }
+    
+    # CA certificate download for clients
+    handle_path /ca-cert {
+        root * /data/caddy/ca
+        file_server browse
+    }
+    
+    # Health check endpoint
+    handle /health {
+        respond "OK" 200
+    }
+}
+
+# Also serve on LAN IP for non-mDNS clients
+{$LAN_IP} {
+    import pos.local
+}
