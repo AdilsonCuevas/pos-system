@@ -15,6 +15,7 @@ from app.api.v1.routes import (
     fde,
     reports,
     sync,
+    config,
 )
 
 api_router = APIRouter()
@@ -42,6 +43,9 @@ api_router.include_router(inventory.router, prefix="/inventory", tags=["Inventor
 
 # FDE (Factura Electrónica)
 api_router.include_router(fde.router, prefix="/fde", tags=["FDE"])
+
+# Configuration
+api_router.include_router(config.router, prefix="/config", tags=["Configuration"])
 
 # Reports
 api_router.include_router(reports.router, prefix="/reports", tags=["Reports"])

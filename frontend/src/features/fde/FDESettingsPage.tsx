@@ -10,6 +10,7 @@ import { Badge } from '@/shared/ui/Badge'
 import { formatCOP, formatDate } from '@/shared/utils/cn'
 import { api } from '@/shared/utils/api'
 import type { FDENumbering } from '@/shared/types/pos'
+import { toast } from '@/shared/hooks/useToast'
 
 export function FDESettingsPage() {
   const queryClient = useQueryClient()
@@ -39,23 +40,210 @@ export function FDESettingsPage() {
   const { data: numberingData } = useQuery({
     queryKey: ['fde', 'numbering'],
     queryFn: async () => {
-      const { data } = await api.get<FDENumbering[]>('/fde/numbering')
+      const { data } = await api.get<FDENumbering[]>('/config/fde/numbering')
       return data
     },
   })
   
   const numbering = numberingData || []
   
-  const savePacConfig = async (e: React.FormEvent) => {
-    e.preventDefault()
-    // In real implementation, this would save to backend config
-    alert('Configuración PAC guardada. Reinicia el backend para aplicar cambios.')
+  // Mutations
+  const savePacConfigMutation = useMutation({
+    mutationFn: async (config: any) => {
+      const { data } = await api.put('/config/fde/pac', config)
+      return data
+    },
+    onSuccess: () => {
+      toast.success('Configuración PAC guardada. Reinicie el backend para aplicar cambios.')
+      queryClient.invalidateQueries({ queryKey: ['config', 'fde', 'pac'] })
+    },
+    onError: (error: any) => {
+      toast.error(`Error: ${error.response?.data?.detail || 'Error al guardar'}`)
+    },
+  })
+  
+  const saveCompanyInfoMutation = useMutation({
+    mutationFn: async (info: any) => {
+      const { data } = await api.put('/config/fde/company', info)
+      return data
+    },
+    onSuccess: () => {
+      toast.success('Información de empresa guardada. Reinicie el backend para aplicar cambios.')
+    },
+    onError: (error: any) => {
+      toast.error(`Error: ${error.response?.data?.detail || 'Error al guardar'}`)
+    },
+  })
+  
+  const createNumberingMutation = useMutation({
+    mutationFn: async (numbering: any) => {
+      const { data } = await api.post('/config/fde/numbering', numbering)
+      return data
+    },
+    onSuccess: () => {
+      toast.success('Numeración creada')
+      queryClient.invalidateQueries({ queryKey: ['fde', 'numbering'] })
+    },
+    onError: (error: any) => {
+      toast.error(`Error: ${error.response?.data?.detail || 'Error al crear'}`)
+    },
+  })
+  
+  const updateNumberingMutation = useMutation({
+    mutationFn: async ({ prefix, data }: { prefix: string; data: any }) => {
+      const { data } = await api.put(`/config/fde/numbering/${prefix}`, data)
+      return data
+    },
+    onSuccess: () => {
+      toast.success('Numeración actualizada')
+      queryClient.invalidateQueries({ queryKey: ['fde', 'numbering'] })
+    },
+    onError: (error: any) => {
+      toast.error(`Error: ${error.response?.data?.detail || 'Error al actualizar'}`)
+    },
+  })
+  
+  const deleteNumberingMutation = useMutation({
+    mutationFn: async (prefix: string) => {
+      await api.delete(`/config/fde/numbering/${prefix}`)
+    },
+    onSuccess: () => {
+      toast.success('Numeración eliminada')
+      queryClient.invalidateQueries({ queryKey: ['fde', 'numbering'] })
+    },
+    onError: (error: any) => {
+      toast.error(`Error: ${error.response?.data?.detail || 'Error al eliminar'}`)
+    },
+  })
+  
+  const [showNumberingForm, setShowNumberingForm] = useState(false)
+  const [editingNumbering, setEditingNumbering] = useState<FDENumbering | null>(null)
+  const [numberingForm, setNumberingForm] = useState({
+    prefix: '',
+    resolution_number: '',
+    resolution_date: '',
+    valid_from: '',
+    valid_until: '',
+    range_start: 1,
+    range_end: 999999,
+    is_active: true,
+  })
+  
+  // Load initial config
+  const { data: pacConfigData } = useQuery({
+    queryKey: ['config', 'fde', 'pac'],
+    queryFn: async () => {
+      const { data } = await api.get('/config/fde/pac')
+      return data
+    },
+  })
+  
+  const { data: companyData } = useQuery({
+    queryKey: ['config', 'fde', 'company'],
+    queryFn: async () => {
+      const { data } = await api.get('/config/fde/company')
+      return data
+    },
+  })
+  
+  // Initialize form state from loaded data
+  const initializeForms = () => {
+    if (pacConfigData) {
+      setPacConfig({
+        pac_provider: pacConfigData.pac_provider,
+        test_mode: pacConfigData.test_mode,
+        tecnodata_api_key: '',
+        facturacion_electronica_co_api_key: '',
+        sfe_api_key: '',
+      })
+    }
+    if (companyData) {
+      setCompanyInfo({
+        company_nit: companyData.company_nit,
+        company_name: companyData.company_name,
+        company_address: companyData.company_address,
+        company_city: companyData.company_city,
+        company_department: companyData.company_department,
+        company_phone: companyData.company_phone || '',
+        company_email: companyData.company_email || '',
+      })
+    }
   }
   
-  const saveCompanyInfo = async (e: React.FormEvent) => {
-    e.preventDefault()
-    alert('Información de empresa guardada.')
+  // Initialize on data load
+  if (pacConfigData || companyData) {
+    initializeForms()
   }
+  
+  const handleSavePacConfig = (e: React.FormEvent) => {
+    e.preventDefault()
+    savePacConfigMutation.mutate(pacConfig)
+  }
+  
+  const handleSaveCompanyInfo = (e: React.FormEvent) => {
+    e.preventDefault()
+    saveCompanyInfoMutation.mutate(companyInfo)
+  }
+  
+  const handleNumberingSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (editingNumbering) {
+      updateNumberingMutation.mutate({ prefix: editingNumbering.prefix, data: numberingForm })
+    } else {
+      createNumberingMutation.mutate(numberingForm)
+    }
+    setShowNumberingForm(false)
+    setEditingNumbering(null)
+  }
+  
+  const handleEditNumbering = (n: FDENumbering) => {
+    setEditingNumbering(n)
+    setNumberingForm({
+      prefix: n.prefix,
+      resolution_number: n.resolution_number,
+      resolution_date: n.resolution_date.split('T')[0],
+      valid_from: n.valid_from.split('T')[0],
+      valid_until: n.valid_until.split('T')[0],
+      range_start: n.range_start,
+      range_end: n.range_end,
+      is_active: n.is_active,
+    })
+    setShowNumberingForm(true)
+  }
+  
+  const handleNewNumbering = () => {
+    setEditingNumbering(null)
+    setNumberingForm({
+      prefix: '',
+      resolution_number: '',
+      resolution_date: '',
+      valid_from: '',
+      valid_until: '',
+      range_start: 1,
+      range_end: 999999,
+      is_active: true,
+    })
+    setShowNumberingForm(true)
+  }
+  
+  const handleNumberingSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (editingNumbering) {
+      updateNumberingMutation.mutate({ prefix: editingNumbering.prefix, data: numberingForm })
+    } else {
+      createNumberingMutation.mutate(numberingForm)
+    }
+    setShowNumberingForm(false)
+    setEditingNumbering(null)
+  }
+  
+  const handleDeleteNumbering = (prefix: string) => {
+    if (confirm(`¿Eliminar numeración ${prefix}?`)) {
+      deleteNumberingMutation.mutate(prefix)
+    }
+  }
+  
+  const numbering = numberingData || []
   
   return (
     <div className="space-y-6">
@@ -94,7 +282,7 @@ export function FDESettingsPage() {
       {/* PAC Config Tab */}
       {activeTab === 'pac' && (
         <Card className="mt-4">
-          <form onSubmit={savePacConfig} className="p-6 space-y-6">
+          <form onSubmit={handleSavePacConfig} className="p-6 space-y-6">
             <div className="border rounded-lg p-4 space-y-4">
               <h3 className="font-semibold flex items-center gap-2"><Shield className="h-5 w-5" />Proveedor de Certificación (PAC)</h3>
               
@@ -145,9 +333,9 @@ export function FDESettingsPage() {
               </ul>
             </div>
             
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full" disabled={savePacConfigMutation.isPending}>
               <Save className="mr-2 h-4 w-4" />
-              Guardar Configuración PAC
+              {savePacConfigMutation.isPending ? 'Guardando...' : 'Guardar Configuración PAC'}
             </Button>
           </form>
         </Card>
@@ -160,7 +348,7 @@ export function FDESettingsPage() {
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="font-semibold">Numeración DIAN (Resolución)</h3>
-                <Button variant="outline" onClick={() => setShowNumberingForm(true)} disabled={numbering.length >= 4}>
+                <Button variant="outline" onClick={handleNewNumbering} disabled={numbering.length >= 4}>
                   <Plus className="mr-2 h-4 w-4" />
                   Agregar Prefijo
                 </Button>
@@ -198,8 +386,8 @@ export function FDESettingsPage() {
                             </Badge>
                           </td>
                           <td className="py-4 text-right">
-                            <Button variant="ghost" size="icon" onClick={() => editNumbering(n)}><Edit className="h-4 w-4" /></Button>
-                            <Button variant="ghost" size="icon" onClick={() => deleteNumbering(n.prefix)} disabled={deleteNumberingMutation.isPending}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleEditNumbering(n)}><Edit className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteNumbering(n.prefix)} disabled={deleteNumberingMutation.isPending}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                           </td>
                         </tr>
                       ))
@@ -209,13 +397,67 @@ export function FDESettingsPage() {
               </div>
             </div>
           </Card>
+          
+          {(showNumberingForm || editingNumbering) && (
+            <Card className="mt-4">
+              <form onSubmit={handleNumberingSubmit} className="p-6 space-y-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">{editingNumbering ? 'Editar Numeración' : 'Nueva Numeración DIAN'}</h3>
+                  <button type="button" onClick={() => { setShowNumberingForm(false); setEditingNumbering(null); }} className="p-2 rounded-lg hover:bg-accent">✕</button>
+                </div>
+                
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Prefijo * (ej: POS, FAC, NC, ND)</label>
+                    <Input value={numberingForm.prefix} onChange={e => setNumberingForm({...numberingForm, prefix: e.target.value.toUpperCase()})} required maxLength={4} disabled={!!editingNumbering} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Número de Resolución *</label>
+                    <Input value={numberingForm.resolution_number} onChange={e => setNumberingForm({...numberingForm, resolution_number: e.target.value})} required placeholder="18760000001" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Fecha Resolución *</label>
+                    <Input type="date" value={numberingForm.resolution_date} onChange={e => setNumberingForm({...numberingForm, resolution_date: e.target.value})} required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Válido Desde *</label>
+                    <Input type="date" value={numberingForm.valid_from} onChange={e => setNumberingForm({...numberingForm, valid_from: e.target.value})} required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Válido Hasta *</label>
+                    <Input type="date" value={numberingForm.valid_until} onChange={e => setNumberingForm({...numberingForm, valid_until: e.target.value})} required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Rango Inicio *</label>
+                    <Input type="number" min="1" value={numberingForm.range_start} onChange={e => setNumberingForm({...numberingForm, range_start: parseInt(e.target.value)})} required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Rango Fin *</label>
+                    <Input type="number" min="1" value={numberingForm.range_end} onChange={e => setNumberingForm({...numberingForm, range_end: parseInt(e.target.value)})} required />
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="is_active" checked={numberingForm.is_active} onChange={e => setNumberingForm({...numberingForm, is_active: e.target.checked})} className="rounded border-input" />
+                  <label htmlFor="is_active" className="text-sm">Activa</label>
+                </div>
+                
+                <div className="flex justify-end gap-3 pt-4 border-t">
+                  <Button type="button" variant="outline" onClick={() => { setShowNumberingForm(false); setEditingNumbering(null); }}>Cancelar</Button>
+                  <Button type="submit" disabled={createNumberingMutation.isPending || updateNumberingMutation.isPending}>
+                    {createNumberingMutation.isPending || updateNumberingMutation.isPending ? 'Guardando...' : (editingNumbering ? 'Actualizar' : 'Crear')}
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          )}
         </div>
       )}
       
       {/* Company Tab */}
       {activeTab === 'company' && (
         <Card>
-          <form onSubmit={saveCompanyInfo} className="p-6 space-y-6">
+          <form onSubmit={handleSaveCompanyInfo} className="p-6 space-y-6">
             <div className="border rounded-lg p-4 space-y-4">
               <h3 className="font-semibold flex items-center gap-2"><Globe className="h-5 w-5" />Datos de la Empresa (para facturas)</h3>
               
@@ -251,9 +493,9 @@ export function FDESettingsPage() {
               </div>
             </div>
             
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full" disabled={saveCompanyInfoMutation.isPending}>
               <Save className="mr-2 h-4 w-4" />
-              Guardar Datos de Empresa
+              {saveCompanyInfoMutation.isPending ? 'Guardando...' : 'Guardar Datos de Empresa'}
             </Button>
           </form>
         </Card>
