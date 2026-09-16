@@ -25,19 +25,36 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 WORKDIR /app
 
 # =============================================================================
-# Builder Stage - Install dependencies
+# Builder Stage - Install dependencies using pip directly
 # =============================================================================
 FROM base as builder
 
-# Install poetry
-RUN pip install --no-cache-dir poetry==1.8.2
+# Install pip tools
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
-# Copy poetry files
-COPY pyproject.toml poetry.lock* ./
-
-# Configure poetry and install dependencies
-RUN poetry config virtualenvs.create false \
-    && poetry install --only=main --no-interaction --no-ansi
+# Install dependencies directly with pip (bypassing poetry lock issues)
+RUN pip install --no-cache-dir \
+    fastapi==0.111.0 \
+    uvicorn[standard]==0.30.1 \
+    sqlalchemy==2.0.30 \
+    asyncmy==0.2.7 \
+    alembic==1.12.1 \
+    pydantic==2.7.4 \
+    pydantic-settings==2.3.3 \
+    pydantic-extra-types==2.7.0 \
+    python-jose[cryptography]==3.3.0 \
+    passlib[argon2]==1.7.4 \
+    bcrypt==4.1.2 \
+    httpx==0.27.0 \
+    python-multipart==0.0.9 \
+    email-validator==2.1.0 \
+    python-dateutil==2.9.0 \
+    pytz==2024.1 \
+    lxml==4.9.3 \
+    xmlschema==3.2.0 \
+    xmlsec==1.3.14 \
+    arq==0.26.0 \
+    redis==4.6.0
 
 # =============================================================================
 # Development Stage
@@ -45,7 +62,19 @@ RUN poetry config virtualenvs.create false \
 FROM builder as development
 
 # Install dev dependencies
-RUN poetry install --with=dev,test --no-interaction --no-ansi
+RUN pip install --no-cache-dir \
+    pytest==8.2.1 \
+    pytest-asyncio==0.23.3 \
+    pytest-cov==4.1.0 \
+    pytest-mock==3.14.0 \
+    factory-boy==3.3.0 \
+    faker==27.2.0 \
+    testcontainers==4.6.0 \
+    ruff==0.4.4 \
+    mypy==1.10.0 \
+    pre-commit==3.7.1 \
+    ipython==8.25.0 \
+    debugpy==1.8.1
 
 # Copy source code
 COPY --chown=appuser:appuser . .
