@@ -16,8 +16,8 @@ RUN apk add --no-cache python3 make g++
 # =============================================================================
 FROM base as deps
 
-COPY package.json package-lock.json* ./
-RUN npm ci --prefer-offline --no-audit --no-fund
+COPY package.json ./
+RUN npm install --prefer-offline --no-audit --no-fund
 
 # =============================================================================
 # Builder Stage

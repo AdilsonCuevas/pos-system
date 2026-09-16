@@ -22,7 +22,7 @@
     "zustand": "^4.5.0",
     "idb": "^8.0.0",
     "date-fns": "^3.3.0",
-    "date-fns-tz": "^2.0.0",
+    "date-fns-tz": "^3.0.0",
     "clsx": "^2.1.0",
     "tailwind-merge": "^2.2.0",
     "lucide-react": "^0.323.0",
