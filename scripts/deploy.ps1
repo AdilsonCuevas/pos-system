@@ -71,7 +71,7 @@ $envContent -split "`n" | ForEach-Object {
 
 # Set as environment variables
 foreach ($key in $envVars.Keys) {
-    $env:$key = $envVars[$key]
+    [Environment]::SetEnvironmentVariable($key, $envVars[$key], "Process")
 }
 
 # -----------------------------------------------------------------------------
@@ -211,7 +211,7 @@ if (-not (Test-Path "$caDir\rootCA.pem")) {
     # Use Docker to generate CA
     try {
         docker run --rm `
-            -v "$caDir:/data" `
+            -v "${caDir}:/data" `
             ghcr.io/caddy-docker-gen/mkcert:latest `
             -install -caroot /data "pos.local" $envVars["LAN_IP"] "localhost"
         Write-Success "mkcert CA generated via Docker"
