@@ -31,10 +31,10 @@ function Write-Log {
     Write-Host "[$time] $Message" -ForegroundColor $Color
 }
 
-function Write-Success { Write-Log "✅ $args[0]" $Green }
-function Write-Warn { Write-Log "⚠️  $args[0]" $Yellow }
-function Write-Error { Write-Log "❌ $args[0]" $Red }
-function Write-Info { Write-Log "ℹ️  $args[0]" $Cyan }
+function Write-Success { Write-Log "[OK] $args[0]" $Green }
+function Write-Warn { Write-Log "[WARN] $args[0]" $Yellow }
+function Write-Error { Write-Log "[ERROR] $args[0]" $Red }
+function Write-Info { Write-Log "[INFO] $args[0]" $Cyan }
 
 # -----------------------------------------------------------------------------
 # Step 1: Set Project Root
@@ -293,27 +293,27 @@ try {
 # -----------------------------------------------------------------------------
 Write-Host ""
 Write-Host "==========================================" -ForegroundColor $Green
-Write-Host "🎉 POS System Deployed Successfully!" -ForegroundColor $Green
+Write-Host "[OK] POS System Deployed Successfully!" -ForegroundColor $Green
 Write-Host "==========================================" -ForegroundColor $Green
 Write-Host ""
-Write-Host "📍 Access URLs:" -ForegroundColor $Cyan
-Write-Host "   • HTTPS (mDNS):  https://pos.local" -ForegroundColor $Gray
-Write-Host "   • HTTPS (IP):    https://$lanIP" -ForegroundColor $Gray
-Write-Host "   • CA Download:   https://$lanIP/ca-cert" -ForegroundColor $Gray
+Write-Host "Access URLs:" -ForegroundColor $Cyan
+Write-Host "   * HTTPS (mDNS):  https://pos.local" -ForegroundColor $Gray
+Write-Host "   * HTTPS (IP):    https://$lanIP" -ForegroundColor $Gray
+Write-Host "   * CA Download:   https://$lanIP/ca-cert" -ForegroundColor $Gray
 Write-Host ""
-Write-Host "🔐 Next Steps:" -ForegroundColor $Cyan
+Write-Host "Next Steps:" -ForegroundColor $Cyan
 Write-Host "   1. Install CA certificate on client devices:" -ForegroundColor $Gray
-Write-Host "      → Open https://$lanIP/ca-cert in browser" -ForegroundColor $Gray
-Write-Host "      → Download and install rootCA.pem" -ForegroundColor $Gray
+Write-Host "      -> Open https://$lanIP/ca-cert in browser" -ForegroundColor $Gray
+Write-Host "      -> Download and install rootCA.pem" -ForegroundColor $Gray
 Write-Host "   2. Access POS at https://pos.local" -ForegroundColor $Gray
 Write-Host "   3. Register first admin user (sets business type)" -ForegroundColor $Gray
 Write-Host "   4. Configure products, (ingredients/recipes if restaurant)" -ForegroundColor $Gray
-Write-Host "   5. Set up FDE (DIAN) in Settings → FDE" -ForegroundColor $Gray
+Write-Host "   5. Set up FDE (DIAN) in Settings -> FDE" -ForegroundColor $Gray
 Write-Host ""
-Write-Host "📋 Useful Commands:" -ForegroundColor $Cyan
-Write-Host "   • View logs:     docker compose logs -f [service]" -ForegroundColor $Gray
-Write-Host "   • Backup:        .\scripts\backup.ps1" -ForegroundColor $Gray
-Write-Host "   • Restore:       .\scripts\restore.ps1" -ForegroundColor $Gray
-Write-Host "   • Stop:          docker compose down" -ForegroundColor $Gray
-Write-Host "   • Restart:       docker compose restart" -ForegroundColor $Gray
+Write-Host "Useful Commands:" -ForegroundColor $Cyan
+Write-Host "   * View logs:     docker compose logs -f [service]" -ForegroundColor $Gray
+Write-Host "   * Backup:        .\scripts\backup.ps1" -ForegroundColor $Gray
+Write-Host "   * Restore:       .\scripts\restore.ps1" -ForegroundColor $Gray
+Write-Host "   * Stop:          docker compose down" -ForegroundColor $Gray
+Write-Host "   * Restart:       docker compose restart" -ForegroundColor $Gray
 Write-Host ""
