@@ -35,7 +35,7 @@ RUN pip install --no-cache-dir poetry==1.8.2
 # Copy poetry files
 COPY pyproject.toml poetry.lock* ./
 
-# Configure poetry
+# Configure poetry and install dependencies
 RUN poetry config virtualenvs.create false \
     && poetry install --only=main --no-interaction --no-ansi
 
